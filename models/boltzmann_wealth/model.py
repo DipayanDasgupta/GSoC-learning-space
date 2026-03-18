@@ -5,6 +5,17 @@ from mesa.discrete_space import OrthogonalMooreGrid
 from mesa.discrete_space.cell_agent import CellAgent
 
 
+def gini(values):
+    """Compute Gini coefficient."""
+    v = sorted(values)
+    n = len(v)
+    if n == 0 or sum(v) == 0:
+        return 0.0
+    return (2 * sum((i + 1) * w for i, w in enumerate(v)) - (n + 1) * sum(v)) / (
+        n * sum(v)
+    )
+
+
 class MoneyAgent(CellAgent):
     """An agent with fixed initial wealth who gives money to neighbours."""
 
@@ -45,17 +56,11 @@ class BoltzmannWealthModel(mesa.Model):
 
 
 if __name__ == "__main__":
-    model = BoltzmannWealthModel(n_agents=50)
-    for _ in range(20):
+    model = BoltzmannWealthModel(n_agents=100)
+    for i in range(50):
         model.step()
     wealth = model.agents.get("wealth")
-    print(f"Total wealth: {sum(wealth)} | Gini: {gini(wealth):.3f}")
-
-
-def gini(values):
-    """Compute Gini coefficient."""
-    v = sorted(values)
-    n = len(v)
-    return (2 * sum((i + 1) * w for i, w in enumerate(v)) - (n + 1) * sum(v)) / (
-        n * sum(v)
-    )
+    print(f"Steps: 50 | Agents: 100")
+    print(f"Total wealth: {sum(wealth)}")
+    print(f"Gini coefficient: {gini(wealth):.3f}")
+    print(f"Min: {min(wealth)} | Max: {max(wealth)}")
