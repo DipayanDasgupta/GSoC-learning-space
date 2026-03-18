@@ -1,7 +1,7 @@
 # Mesa GSoC Learning Space — Dipayan Dasgupta
 
 ## About me
-CS student interested in ML/NLP and agent-based modelling. Applying for GSoC 2026 with Mesa.
+Engineering major from IIT Madras interested in ML/NLP and agent-based modelling. Applying for GSoC 2026 with Mesa.
 
 ## Models built
 
