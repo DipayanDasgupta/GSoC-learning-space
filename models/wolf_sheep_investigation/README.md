@@ -45,4 +45,4 @@ Fix: add `if m in df.columns:` guard before every `ax.plot()` call.
 - `tests/examples/test_examples.py`
 
 ## PR
-https://github.com/projectmesa/mesa/pull/3608
+https://github.com/projectmesa/mesa/pull/3597
