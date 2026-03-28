@@ -1,31 +1,27 @@
+"""Spatial Coalition Demo — Pillar 3 PoC  (Mesa 3.5.1, released pip package)
+
+Demonstrates candidate-count reduction via spatial neighbourhood filtering.
+
+FIX 1: GridAgent inherits CellAgent  (move_to lives on CellAgent, not mesa.Agent)
+FIX 2: capacity placement via inline cell.is_full  (cells_with_capacity not
+        in the released pip 3.5.1 package — it lives only in the dev branch)
+FIX 3: benchmarking logic lives in evaluate(), NOT step().
+        Mesa 3.5.1 Model.__step__ machinery discards the return value of
+        overridden step() methods in some call paths, so returning a tuple
+        from step() gives None at the call site.  evaluate() is a plain
+        instance method with no such interference.
+
+Run:  python models/spatial_coalition/model.py
 """
-Spatial Coalition Demo — Pillar 3 Proof of Concept
-===================================================
-Demonstrates the candidate count reduction from spatial filtering.
-
-Compares:
-  - Naive: find_combinations on ALL agents -> O(C(N,k)) candidates
-  - Spatial: filter to Moore-1 neighbourhood -> O(C(neighbourhood_size, k))
-
-For N=200 agents on a 20x20 grid, k=3:
-  - Naive:   C(200,3) = 1,313,400 candidate triples per step
-  - Spatial: ~C(8,3) = 56 per agent -> ~11,200 total (after dedup)
-  - Reduction: ~99% fewer evaluations
-
-Run with:
-    python models/spatial_coalition/model.py
-"""
-
+from __future__ import annotations
 import mesa
 from itertools import combinations
+from math import comb
 from mesa.discrete_space import OrthogonalMooreGrid
+from mesa.discrete_space.cell_agent import CellAgent          # FIX 1
 
 
-# ── Agent ─────────────────────────────────────────────────────────────────────
-
-class GridAgent(mesa.Agent):
-    """Simple agent on a discrete grid."""
-
+class GridAgent(CellAgent):                                    # FIX 1: was mesa.Agent
     def __init__(self, model: mesa.Model, value: float) -> None:
         super().__init__(model)
         self.value = value
@@ -34,50 +30,52 @@ class GridAgent(mesa.Agent):
         pass
 
 
-# ── Spatial find_combinations (Pillar 3 prototype) ───────────────────────────
+# ── Inline capacity helpers (FIX 2) ──────────────────────────────────────────
 
-def spatial_find_combinations(
-    agents: list,
-    size: int,
-    evaluation_func,
-    radius: int = 1,
-):
-    """
-    Pillar 3 prototype: restrict coalition search to spatial neighbourhoods.
+def _not_full_cells(grid) -> list:
+    """Mesa 3.5.1 pip doesn't expose cells_with_capacity — compute inline."""
+    return [c for c in grid._cells.values() if not c.is_full]
 
-    For each agent, considers only agents in its Moore neighbourhood at
-    given radius. Deduplicates candidate groups (frozenset) to avoid
-    double-counting.
+
+def _random_not_full_cell(grid, rng):
+    available = _not_full_cells(grid)
+    if not available:
+        raise ValueError("All grid cells are full — increase grid size or capacity")
+    return rng.choice(available)
+
+
+# ── Spatial coalition helper ──────────────────────────────────────────────────
+
+def spatial_find_combinations(agents: list, size: int, evaluation_func):
+    """Filter coalition candidates to Moore-1 neighbourhood only.
+
+    This is the Pillar 3 spatial_find_combinations() prototype.
+    Reduces search space from C(N,k) to O(N * neighbourhood^(k-1)).
     """
-    seen: set = set()
+    seen: set   = set()
     results: list = []
+    agent_set   = set(agents)
 
     for agent in agents:
-        # Get neighbourhood agents via cell.connections
-        neighbours = set()
+        pool: set = {agent}
         for conn_cell in agent.cell.connections.values():
-            for nb_agent in conn_cell.agents:
-                if isinstance(nb_agent, GridAgent):
-                    neighbours.add(nb_agent)
-        # Include self; exclude agents not in this run's list
-        candidate_pool = (neighbours | {agent}) & set(agents)
-        candidate_pool = list(candidate_pool)
+            for nb in conn_cell.agents:
+                if isinstance(nb, GridAgent):
+                    pool.add(nb)
+        pool &= agent_set
 
-        if len(candidate_pool) < size:
+        if len(pool) < size:
             continue
 
-        for group in combinations(candidate_pool, size):
+        for group in combinations(list(pool), size):
             key = frozenset(a.unique_id for a in group)
             if key in seen:
                 continue
             seen.add(key)
-            score = evaluation_func(group)
-            results.append((list(group), score))
+            results.append((list(group), evaluation_func(group)))
 
     return results
 
-
-# ── Simple evaluation function ────────────────────────────────────────────────
 
 def coalition_value(group) -> float:
     return sum(a.value for a in group)
@@ -86,65 +84,64 @@ def coalition_value(group) -> float:
 # ── Model ─────────────────────────────────────────────────────────────────────
 
 class SpatialCoalitionModel(mesa.Model):
-    """
-    Compares naive vs. spatial coalition search on a 20x20 grid.
-    Demonstrates the candidate count reduction for Pillar 3.
-    """
+    """Benchmark naive vs. spatial coalition candidate counts."""
 
     def __init__(self, n_agents: int = 200, seed: int = 42) -> None:
         super().__init__(seed=seed)
-        self.grid = OrthogonalMooreGrid((20, 20), capacity=2, torus=False)
+        self.grid = OrthogonalMooreGrid(
+            (20, 20), capacity=2, torus=False, random=self.random  # FIX: random= not rng=
+        )
         GridAgent.create_agents(
             self, n_agents,
             value=[self.rng.uniform(0.1, 1.0) for _ in range(n_agents)],
         )
-        # Place agents on random non-full cells
         for agent in self.agents:
-            cell = self.grid.select_random_not_full_cell()  # PR #3542 API
+            cell = _random_not_full_cell(self.grid, self.rng)  # FIX 2
             agent.move_to(cell)
 
-    def step(self) -> None:
-        agents = list(self.agents)
-        n = len(agents)
-        size = 3
+    # FIX 3: evaluation lives in evaluate(), not step()
+    def evaluate(self) -> tuple[int, int]:
+        """Return (spatial_count, naive_count) for the current agent set."""
+        agents     = list(self.agents)
+        n, k       = len(agents), 3
 
-        # ── Naive count (no spatial filter) ──────────────────────────────────
-        from math import comb
-        naive_count = comb(n, size)
+        naive_count    = comb(n, k)
+        spatial_combos = spatial_find_combinations(agents, k, coalition_value)
+        spatial_count  = len(spatial_combos)
+        reduction_pct  = (1 - spatial_count / naive_count) * 100
 
-        # ── Spatial count ─────────────────────────────────────────────────────
-        spatial_combos = spatial_find_combinations(
-            agents=agents,
-            size=size,
-            evaluation_func=coalition_value,
-            radius=1,
-        )
-        spatial_count = len(spatial_combos)
-
-        reduction_pct = (1 - spatial_count / naive_count) * 100
-
-        print(f"\nN={n} agents, k={size}, Moore-1 neighbourhood")
-        print(f"  Naive candidates:   {naive_count:,}")
-        print(f"  Spatial candidates: {spatial_count:,}")
-        print(f"  Search space reduction: {reduction_pct:.1f}%")
+        print(f"\n  N={n} agents, k={k}, Moore-1 neighbourhood")
+        print(f"    Naive candidates:    {naive_count:,}")
+        print(f"    Spatial candidates:  {spatial_count:,}")
+        print(f"    Search-space reduction: {reduction_pct:.1f}%")
 
         if spatial_combos:
             best_group, best_score = max(spatial_combos, key=lambda x: x[1])
-            print(f"\n  Best spatial coalition: agents "
-                  f"{[a.unique_id for a in best_group]}, "
+            print(f"    Best: agents {[a.unique_id for a in best_group]}, "
                   f"score={best_score:.3f}")
+
+        return spatial_count, naive_count
+
+    def step(self) -> None:
+        """Mesa-compatible step — delegates to evaluate() and discards the tuple."""
+        self.evaluate()
 
 
 def run_demo() -> None:
     print("=" * 60)
-    print("Spatial Coalition Demo — Pillar 3 PoC")
-    print("Demonstrates DiscreteSpace-aware candidate filtering")
+    print("Spatial Coalition Demo — Pillar 3 PoC  [Mesa 3.5.1]")
     print("=" * 60)
+
     for n in [50, 100, 200]:
         model = SpatialCoalitionModel(n_agents=n)
-        model.step()
-    print("\nConclusion: spatial filtering reduces candidates by >97%")
-    print("for N=200 agents on a 20x20 grid.")
+        # FIX 3: call evaluate(), NOT step(), to get the return value
+        spatial_count, naive_count = model.evaluate()
+        reduction = (1 - spatial_count / naive_count) * 100
+        assert reduction > 80, (
+            f"Expected >80% search-space reduction for N={n}, got {reduction:.1f}%"
+        )
+
+    print("\n  ✅ Spatial filtering confirmed >80% search-space reduction.")
     print("=" * 60)
 
 
