@@ -58,3 +58,14 @@ role — transforming state to scored action — but with LLM reasoning replacin
 the deterministic scoring function. PR #3567's type validation ensures the
 evaluation function returns a numeric value; the same invariant applies to
 LangGraph nodes that must return a valid action.
+
+---
+
+## Connection to GSoC 2026 Proposal
+
+This model was the key investigation that motivated the new **Meta Agents** proposal:
+1. Building it revealed the type-validation gap now fixed in PR #3567.
+2. The absence of a `join()` method — you cannot add a new ally without dissolving
+   and recreating the alliance — directly motivated Pillar 1's lifecycle API.
+3. The `alliance_value()` scoring function is the template for Pillar 2's
+   `LLMEvaluationAgent` (replace the deterministic formula with an LLM call).
