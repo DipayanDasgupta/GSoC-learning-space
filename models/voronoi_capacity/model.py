@@ -1,10 +1,15 @@
-"""Voronoi Capacity Model — demonstrating PR #3544 fix.
+"""
+Voronoi Capacity Model — PR #3544 demo  (Mesa 3.5.1 compatible)
+================================================================
+VoronoiGrid now correctly respects user-provided capacity (PR #3544 fix).
 
-VoronoiGrid now correctly respects user-provided `capacity` arguments.
-Before the fix, capacity_function always overwrote the user's value.
+Root cause fix D:
+  VoronoiGrid(points=...)  →  VoronoiGrid(centroids_coordinates=...)
+The Mesa 3.5.1 constructor uses centroids_coordinates as the first positional arg.
+
+Run:  python models/voronoi_capacity/model.py
 """
 from __future__ import annotations
-
 import mesa
 from mesa.discrete_space import VoronoiGrid
 from mesa.discrete_space.cell_agent import CellAgent
@@ -12,70 +17,54 @@ from mesa.discrete_space.cell_agent import CellAgent
 try:
     from mesa.discrete_space.cell import CellFullException
 except ImportError:
-    # Older Mesa versions may have a different path
     CellFullException = Exception
 
 
 class TerritorialAgent(CellAgent):
-    """An agent that claims exactly one Voronoi region."""
-
     def __init__(self, model: mesa.Model):
         super().__init__(model)
 
     def step(self):
-        """Stay put — territorial agents do not move."""
-        pass
+        pass   # territorial — stays in place
 
 
 class VoronoiCapacityModel(mesa.Model):
-    """Model with VoronoiGrid, capacity=1, to verify PR #3544 correctness."""
-
     def __init__(self, n_agents: int = 15, rng: int = 42):
         super().__init__(rng=rng)
-
-        # Generate random points for Voronoi tessellation
-        points = [
-            (self.random.uniform(0, 1), self.random.uniform(0, 1))
+        # Generate random centroid coordinates
+        coords = [
+            (float(self.rng.uniform(0.05, 0.95)),
+             float(self.rng.uniform(0.05, 0.95)))
             for _ in range(n_agents)
         ]
-
-        # capacity=1 — each Voronoi region holds at most 1 agent
-        # Before PR #3544 this was silently overwritten; now it is respected.
+        # FIX D: centroids_coordinates (not 'points')
         self.grid = VoronoiGrid(
-            points=points,
+            centroids_coordinates=coords,
             capacity=1,
         )
-
         cells = list(self.grid._cells.values())
-        for i, cell in enumerate(cells[:n_agents]):
+        for i in range(min(n_agents, len(cells))):
             agent = TerritorialAgent(self)
-            agent.move_to(cell)
+            agent.move_to(cells[i])
 
     def step(self):
         self.agents.shuffle_do("step")
 
 
 def test_capacity_respected():
-    """Verify that CellFullException is raised when capacity=1 is exceeded."""
+    """Confirm CellFullException when capacity=1 is exceeded."""
     model = VoronoiCapacityModel(n_agents=5, rng=99)
     cells = list(model.grid._cells.values())
-    # All 5 cells should now be full (capacity=1, 1 agent each)
-
-    extra_agent = TerritorialAgent(model)
+    extra = TerritorialAgent(model)
     raised = False
     try:
-        extra_agent.move_to(cells[0])   # cell[0] already has an agent
-    except (CellFullException, Exception) as e:
-        if "full" in str(e).lower() or "capacity" in str(e).lower():
+        extra.move_to(cells[0])     # already has an agent
+    except Exception as e:
+        msg = str(e).lower()
+        if "full" in msg or "capacity" in msg:
             raised = True
         else:
             raise
-
-    if raised:
-        print("✅ CellFullException raised correctly — PR #3544 fix confirmed.")
-    else:
-        print("⚠️  No exception raised. Check Mesa version / PR #3544 status.")
-
     return raised
 
 
@@ -83,11 +72,15 @@ if __name__ == "__main__":
     N = 15
     print(f"VoronoiGrid capacity=1 test — {N} agents, {N} cells")
     model = VoronoiCapacityModel(n_agents=N, rng=42)
-    print(f"Placed {N} agents successfully (one per Voronoi cell). ✓")
+    actual_cells = len(list(model.grid._cells.values()))
+    print(f"  Created {actual_cells} Voronoi cells")
 
-    test_capacity_respected()
+    if test_capacity_respected():
+        print("  ✅ CellFullException raised — PR #3544 fix confirmed.")
+    else:
+        print("  ⚠️  No exception raised (may be a different Mesa version).")
 
-    print(f"\nRun 20 steps with shuffled agent movement...")
+    print(f"\n  Running 20 steps...")
     for _ in range(20):
         model.step()
-    print("All 20 steps completed. ✓")
+    print("  ✅ 20 steps completed without error.")

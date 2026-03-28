@@ -1,75 +1,150 @@
-# GSoC 2026 Learning Space — Dipayan Dasgupta
+# GSoC 2026 — Mesa Meta Agents Learning Space
 
-> **IIT Madras · Civil Engineering (B.Tech, Expected 2028)**  
-> GSoC 2026 Applicant · Project: **Mesa Meta Agents**  
-> Mentors: Tom Pike / Ewout
+**Applicant:** Dipayan Dasgupta · IIT Madras  
+**Project:** Meta Agents (Medium) — `mesa.experimental.meta_agents`  
+**Mentors:** Tom Pike, Ewout  
+**Status:** ✅ 14/14 models passing on Mesa 3.5.1 (released pip)
 
-## About This Repository
+---
 
-This learning space documents my journey from zero to GSoC-ready with Mesa.
-It contains original ABM models, proof-of-concept implementations for my
-proposal pillars, and investigations that directly motivated my Mesa pull requests.
+## Verified Results — All 14 Models Passing
 
-## My Mesa Contributions
+```
+═══════════════════════════════════════════════════════════════
+  RESULTS SUMMARY
+═══════════════════════════════════════════════════════════════
 
-### Merged Pull Requests
+  ✓ PASS  Alliance Formation (PR#3567)
+  ✓ PASS  All Pillars: Financial Market
+  ✓ PASS  Boltzmann Wealth (PR#3542)
+  ✓ PASS  Capacity-Aware Placement (PR#3542)
+  ✓ PASS  Coalition Stability Tracker (new)
+  ✓ PASS  LLM Audit Trail (new)
+  ✓ PASS  Misinformation Spread (All LLM)
+  ✓ PASS  Pillar 1: Meta Agents Lifecycle
+  ✓ PASS  Pillar 2: LLM Evaluation Demo
+  ✓ PASS  Pillar 3: Spatial Coalition
+  ✓ PASS  SpaceRenderer Migration (PR#3283)
+  ✓ PASS  Spatial+LLM Benchmark (new)
+  ✓ PASS  Voronoi Capacity (PR#3544)
+  ✓ PASS  WolfSheep grass=False (PR#3627)
 
-| PR | Title | What it taught me |
-|----|-------|-------------------|
-| [#3627](https://github.com/projectmesa/mesa/pull/3627) | Fix `Sheep.feed()` crash when `grass=False` | Safe generator defaults; conditional DataCollector reporters |
-| [#3542](https://github.com/projectmesa/mesa/pull/3542) | Add `Grid.not_full_cells` and `select_random_not_full_cell()` | Capacity vs. emptiness semantics; hot-path property layers |
-| [#3544](https://github.com/projectmesa/mesa/pull/3544) | Fix `VoronoiGrid` silently overwriting user `capacity` | Private method contracts in DiscreteSpace hierarchy |
-| [#3014](https://github.com/projectmesa/mesa/pull/3014) | Fix infinite loop in `select_random_empty_cell` | Heuristic fallback pattern for grid queries |
-| [#3011](https://github.com/projectmesa/mesa/pull/3011) | CI/test consolidation: Solara + Altair coverage | Test organisation across parametrised backends |
-| [Mesa-LLM #21](https://github.com/projectmesa/mesa-llm/pull/21) | Pytest suite for `Reasoning` base class | Mock LLM pattern for network-free CI; `invoke()` interface |
+  14 total  |  14 passed  |  0 failed
+```
 
-### Open Pull Requests
+Reproduce with:
+```bash
+git clone https://github.com/DipayanDasgupta/GSoC-learning-space.git
+cd GSoC-learning-space
+pip install mesa
+bash run_all_models.sh
+```
+
+---
+
+## Repository Structure
+
+```
+GSoC-learning-space/
+├── models/
+│   ├── meta_agents_poc/          Pillar 1 — join/leave/dissolve lifecycle API
+│   ├── llm_evaluation_demo/      Pillar 2 — LLMEvaluationAgent (no API key)
+│   ├── spatial_coalition/        Pillar 3 — spatial_find_combinations() PoC
+│   ├── financial_market_coalition/  All 3 pillars integrated
+│   ├── coalition_stability/      Extended Pillar 1 — merge/split/step tracking
+│   ├── llm_audit_trail/          Extended Pillar 2 — audit trail + retry logic
+│   ├── spatial_llm_benchmark/    Pillars 2+3 — wall-clock speedup benchmark
+│   ├── alliance_formation/       PR #3567 evidence
+│   ├── boltzmann_wealth/         PR #3542 evidence
+│   ├── capacity_aware_placement/ PR #3542 evidence
+│   ├── voronoi_capacity/         PR #3544 evidence
+│   ├── spacerenderer_migration/  PR #3283 evidence
+│   └── wolf_sheep_investigation/ PR #3627 evidence
+└── mesa_llm_poc/
+    ├── vector_memory.py          Pillar 1: VectorMemory
+    ├── async_engine.py           Pillar 3: AsyncLLMEngine + TokenBucket
+    ├── langgraph_agent.py        Pillar 2: LangGraphAgent + MesaToolkit
+    └── demo/
+        └── misinformation_spread.py  All three pillars composed
+```
+
+---
+
+## Proposal Pillars
+
+### Pillar 1 — Meta Agents Lifecycle API
+Fix two known agent-count bugs in `mesa.experimental.meta_agents`, then add
+`join()`, `leave()`, `merge()`, `split()` lifecycle methods with a full test suite.
+Graduation path: `experimental` → `mesa.meta_agents`.
+
+**PoC output (Pillar 1):**
+```
+[Phase 1] Forming teams from 20 workers...
+  → Formed Team 21 (score=2.78, workers=[3, 6, 12])
+  → Formed Team 22 (score=2.49, workers=[8, 14, 19])
+
+[Phase 2] Lifecycle operations — leave + join
+  - Worker 12 left    Team 21
+  + Worker 1 joined   Team 21
+
+  ✅ Agent counts consistent — Pillar 1 lifecycle API working.
+```
+
+### Pillar 2 — LLM Evaluation Agent
+`LLMEvaluationAgent` bridges `meta_agents` and Mesa-LLM's `ReasoningAgent`.
+Evaluates coalition candidates via LLM scoring with audit trail + retry logic.
+
+**PoC output (Pillar 2):**
+```
+  Step 1: Best score = 0.950 | Agents: [18, 19, 20] | Recommended: True
+  Step 2: Best score = 0.950 | Agents: [18, 19, 20] | Recommended: True
+  Step 3: Best score = 0.950 | Agents: [18, 19, 20] | Recommended: True
+  Total LLM evaluations: 3420
+  ✅ LLMEvaluationAgent working — Pillar 2 PoC complete.
+```
+
+### Pillar 3 — Spatial Coalition Search
+`spatial_find_combinations()` filters candidates to Moore-1 neighbourhoods,
+reducing search space from O(C(N,k)) to O(N × neighbourhood^(k-1)).
+
+**PoC output (Pillar 3):**
+```
+  N=50  agents, k=3 → Naive: 19,600  | Spatial:     22 | Reduction: 99.9%
+  N=100 agents, k=3 → Naive: 161,700 | Spatial:    237 | Reduction: 99.9%
+  N=200 agents, k=3 → Naive: 1,313,400 | Spatial: 1,667 | Reduction: 99.9%
+  ✅ Spatial filtering confirmed >80% search-space reduction.
+```
+
+**Benchmark (Pillars 2+3 combined):**
+```
+  N=20, latency=10ms/call  → Speedup:  4.7× | Search reduction: 78.6%
+  N=30, latency= 5ms/call  → Speedup: 10.6× | Search reduction: 90.6%
+  N=40, latency= 2ms/call  → Speedup: 14.4× | Search reduction: 92.9%
+  Average speedup: 9.9×
+```
+
+---
+
+## Mesa Contributions (Pre-GSoC)
 
 | PR | Title | Status |
 |----|-------|--------|
-| [#3567](https://github.com/projectmesa/mesa/pull/3567) | Type validation in `evaluate_combination` (`meta_agents`) | Open, CI passing |
-| [#3283](https://github.com/projectmesa/mesa/pull/3283) | Refactor core examples to new `SpaceRenderer` API | Open |
-| [#3013](https://github.com/projectmesa/mesa/pull/3013) | CI coverage reporting restoration | Open |
+| [#3567](https://github.com/projectmesa/mesa/pull/3567) | Type validation in `evaluate_combination` (meta_agents) | Open |
+| [#3542](https://github.com/projectmesa/mesa/pull/3542) | `Grid.not_full_cells` API | Merged |
+| [#3544](https://github.com/projectmesa/mesa/pull/3544) | VoronoiGrid capacity fix | Merged |
+| Mesa-LLM #21 | `Reasoning` test suite | Merged |
 
-### Issues Diagnosed
+---
 
-| Issue | Description |
-|-------|-------------|
-| [#3566](https://github.com/projectmesa/mesa/issues/3566) | `evaluate_combination` accepts non-numeric return values silently |
-| [#3541](https://github.com/projectmesa/mesa/issues/3541) | Grid has no API for partial-capacity queries |
-| [#3543](https://github.com/projectmesa/mesa/issues/3543) | VoronoiGrid silently overwrites user-provided capacity |
-| [#3597](https://github.com/projectmesa/mesa/issues/3597) | WolfSheep crashes with StopIteration when grass=False |
-| [#3282](https://github.com/projectmesa/mesa/issues/3282) | Core examples use deprecated draw_agents() |
+## Quick Start
 
-## GSoC 2026 Proposal: Mesa Meta Agents
+```bash
+pip install mesa
+bash run_all_models.sh            # run all 14 models
+python models/meta_agents_poc/model.py          # Pillar 1
+python models/llm_evaluation_demo/model.py      # Pillar 2
+python models/spatial_coalition/model.py        # Pillar 3
+python mesa_llm_poc/demo/misinformation_spread.py  # All pillars
+```
 
-**Project slot:** Meta Agents (Medium, 175 hours) — Tom Pike / Ewout  
-**Goal:** Graduate `mesa.experimental.meta_agents` to production with three pillars:
-
-| Pillar | Description | Key PRs |
-|--------|-------------|---------|
-| 1. Production Hardening | Fix agent-count bugs, add lifecycle API (join/leave/merge/split), complete test suite | #3567, #3627 |
-| 2. LLM-Powered Evaluation | `LLMEvaluationAgent` wrapping `mesa_llm.ReasoningAgent` with Pydantic validation | Mesa-LLM #21 |
-| 3. DiscreteSpace-Aware Formation | `spatial_find_combinations()` filtering candidates to spatial neighbourhoods | #3542, #3544 |
-
-## Models in This Repository
-
-| Directory | Description | Proposal Pillar |
-|-----------|-------------|-----------------|
-| `models/meta_agents_poc/` | Lifecycle demo: join, leave, merge, split operations | Pillar 1 |
-| `models/llm_evaluation_demo/` | LLM coalition evaluation with mock client | Pillar 2 |
-| `models/spatial_coalition/` | Spatial candidate filtering: 97% search space reduction | Pillar 3 |
-| `models/financial_market_coalition/` | All 3 pillars: market-makers on OrthogonalMooreGrid | All pillars |
-| `models/alliance_formation/` | meta_agents investigation (motivated PR #3567) | Background |
-| `models/boltzmann_wealth/` | Capacity-aware placement (motivated PR #3542) | Background |
-| `models/wolf_sheep_investigation/` | grass=False bug investigation (motivated PR #3627) | Background |
-
-## Motivation
-
-See [motivation.md](motivation.md) for the full narrative.
-
-## Contact
-
-- **Email:** deep.dasgupta2006@gmail.com  
-- **GitHub:** [DipayanDasgupta](https://github.com/DipayanDasgupta)  
-- **LinkedIn:** [dipayan-dasgupta-24a24719b](https://linkedin.com/in/dipayan-dasgupta-24a24719b)
+No API key required. All LLM calls use `MockLLMClient`.

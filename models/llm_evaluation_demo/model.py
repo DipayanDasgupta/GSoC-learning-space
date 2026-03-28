@@ -1,112 +1,76 @@
 """
-LLM Evaluation Demo — Pillar 2 Proof of Concept
-================================================
-Demonstrates the LLMEvaluationAgent concept WITHOUT requiring an API key.
-Uses a MockLLM that simulates structured JSON responses.
+LLM Evaluation Demo — Pillar 2 PoC  (Mesa 3.5.1 compatible)
+=============================================================
+LLMEvaluationAgent: callable drop-in for find_combinations evaluation_func.
+MockLLM returns structured JSON — no API key needed.
 
-This PoC shows:
-1. A callable evaluator that wraps an LLM interface
-2. Pydantic-validated structured output (CoalitionScore)
-3. Natural-language rationale strings logged to DataCollector
-4. Drop-in replacement for a plain evaluation_func
+Root cause fix: import find_combinations from .meta_agent submodule.
 
-Run with:
-    python models/llm_evaluation_demo/model.py
-
-No API key required — MockLLM simulates responses locally.
+Run:  python models/llm_evaluation_demo/model.py
 """
-
+from __future__ import annotations
 import json
 import random
+from dataclasses import dataclass
 from typing import Any
-from dataclasses import dataclass, field
 
 import mesa
-from mesa.experimental.meta_agents import find_combinations
+# FIX A: correct import path
+from mesa.experimental.meta_agents.meta_agent import find_combinations
 
-
-# ── Pydantic-style validation (stdlib only, no pydantic dependency) ───────────
 
 @dataclass
 class CoalitionScore:
-    """Structured output schema for LLM evaluator."""
-    score: float           # 0.0 to 1.0 compatibility score
-    rationale: str         # natural-language explanation
-    recommended: bool      # binary accept/reject decision
+    """Validated structured output from the LLM evaluator."""
+    score: float
+    rationale: str
+    recommended: bool
 
     @classmethod
     def from_dict(cls, data: dict) -> "CoalitionScore":
         score = float(data["score"])
         if not (0.0 <= score <= 1.0):
-            raise ValueError(f"score must be in [0, 1], got {score}")
-        return cls(
-            score=score,
-            rationale=str(data["rationale"]),
-            recommended=bool(data["recommended"]),
-        )
+            raise ValueError(f"score must be [0,1], got {score}")
+        return cls(score=score, rationale=str(data["rationale"]),
+                   recommended=bool(data["recommended"]))
 
-
-# ── Mock LLM (no API key needed) ─────────────────────────────────────────────
 
 class MockLLM:
-    """
-    Simulates an LLM client returning structured JSON for coalition evaluation.
-    Replace with a real openai.OpenAI() client when you have an API key.
-    """
-
+    """No-API-key mock LLM returning structured JSON coalition scores."""
     def invoke(self, prompt: str) -> str:
-        """Return a mock JSON response evaluating a coalition."""
-        # Simulate: compatible agents (similar risk) score higher
         score = round(random.uniform(0.3, 0.95), 2)
-        recommended = score > 0.6
-        rationale = (
-            f"The agents share complementary attributes. "
-            f"Estimated coalition compatibility: {score:.0%}. "
-            f"{'Recommended for formation.' if recommended else 'Insufficient compatibility.'}"
-        )
+        rec   = score > 0.6
         return json.dumps({
             "score": score,
-            "rationale": rationale,
-            "recommended": recommended,
+            "rationale": (
+                f"Agents show {'complementary' if rec else 'conflicting'} "
+                f"profiles. Compatibility: {score:.0%}."
+            ),
+            "recommended": rec,
         })
 
 
-# ── LLMEvaluationAgent (Pillar 2 prototype) ──────────────────────────────────
-
 class LLMEvaluationAgent:
-    """
-    Abstract base for LLM-powered coalition evaluation.
+    """Abstract callable that wraps an LLM and returns a float score.
 
-    This is the core Pillar 2 concept: a callable that wraps an LLM
-    and returns a CoalitionScore. It is a drop-in replacement for a
-    plain evaluation_func in find_combinations().
+    Drop-in replacement for a plain evaluation_func in find_combinations().
+    This is the core Pillar 2 prototype.
     """
-
     def __init__(self, llm: Any, system_prompt: str) -> None:
         self.llm = llm
         self.system_prompt = system_prompt
         self.evaluation_log: list[dict] = []
 
     def describe_group(self, group) -> str:
-        """Build a natural-language description of the candidate coalition."""
         raise NotImplementedError
 
     def __call__(self, group) -> float:
-        """
-        Invoke the LLM, parse the response, log the rationale, return the score.
-        This is the callable interface that find_combinations() expects.
-        """
-        description = self.describe_group(group)
-        prompt = f"{self.system_prompt}\n\n{description}\n\nRespond in JSON only."
+        prompt = f"{self.system_prompt}\n\n{self.describe_group(group)}\n\nJSON only."
         raw = self.llm.invoke(prompt)
         try:
             parsed = CoalitionScore.from_dict(json.loads(raw))
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            # Type boundary enforcement — analogous to PR #3567
-            raise TypeError(
-                f"LLM returned an invalid response: {e}\nRaw: {raw}"
-            ) from e
-        # Log for DataCollector
+            raise TypeError(f"LLM bad response: {e}\nRaw: {raw}") from e
         self.evaluation_log.append({
             "group": [a.unique_id for a in group],
             "score": parsed.score,
@@ -116,99 +80,73 @@ class LLMEvaluationAgent:
         return parsed.score
 
 
-# ── Concrete evaluator for negotiation agents ─────────────────────────────────
-
 class NegotiationEvaluator(LLMEvaluationAgent):
-    """LLM evaluator for negotiation-agent coalitions."""
-
     def describe_group(self, group) -> str:
         lines = [
-            f"Agent {a.unique_id}: "
-            f"ideology={a.ideology:.2f}, "
-            f"resources={a.resources:.2f}, "
-            f"cooperativeness={a.cooperativeness}"
+            f"Agent {a.unique_id}: ideology={a.ideology:.2f}, "
+            f"resources={a.resources:.2f}, cooperativeness={a.cooperativeness}"
             for a in group
         ]
-        return (
-            "Evaluate whether these agents should form a negotiation coalition:\n"
-            + "\n".join(lines)
-        )
+        return "Evaluate negotiation coalition:\n" + "\n".join(lines)
 
-
-# ── Agents ────────────────────────────────────────────────────────────────────
 
 class NegotiationAgent(mesa.Agent):
-    """Agent with ideology, resources, and cooperativeness attributes."""
-
     def __init__(self, model, ideology: float, resources: float,
                  cooperativeness: str) -> None:
         super().__init__(model)
         self.ideology = ideology
         self.resources = resources
-        self.cooperativeness = cooperativeness  # "high" | "medium" | "low"
+        self.cooperativeness = cooperativeness
 
     def step(self) -> None:
         pass
 
 
-# ── Model ─────────────────────────────────────────────────────────────────────
-
 class NegotiationModel(mesa.Model):
-    """
-    20 negotiation agents form coalitions evaluated by a mock LLM.
-    Demonstrates Pillar 2: LLM-powered coalition evaluation.
-    """
+    """20 agents form coalitions scored by a mock LLM."""
 
     def __init__(self, n_agents: int = 20, seed: int = 42) -> None:
         super().__init__(seed=seed)
-        cooperativeness_choices = ["high", "medium", "low"]
+        choices = ["high", "medium", "low"]
         NegotiationAgent.create_agents(
             self, n_agents,
             ideology=[self.rng.uniform(-1, 1) for _ in range(n_agents)],
             resources=[self.rng.uniform(0, 100) for _ in range(n_agents)],
-            cooperativeness=[
-                cooperativeness_choices[self.rng.integers(0, 3)]
-                for _ in range(n_agents)
-            ],
+            cooperativeness=[choices[self.rng.integers(0, 3)] for _ in range(n_agents)],
         )
-        mock_llm = MockLLM()
         self.evaluator = NegotiationEvaluator(
-            llm=mock_llm,
+            llm=MockLLM(),
             system_prompt=(
-                "You are evaluating potential negotiation coalitions. "
-                "Consider ideology alignment, resource complementarity, and "
-                "cooperativeness. Return a JSON object with keys: "
-                "score (float 0-1), rationale (str), recommended (bool)."
+                "Evaluate negotiation coalitions on ideology, resources, "
+                "cooperativeness. Return JSON: {score: float 0-1, "
+                "rationale: str, recommended: bool}."
             ),
         )
 
     def step(self) -> None:
         combos = find_combinations(
-            self,
-            list(self.agents),
-            size=3,
-            evaluation_func=self.evaluator,
+            self, list(self.agents), size=3, evaluation_func=self.evaluator
         )
         if combos:
             best_group, best_score = max(combos, key=lambda x: x[1])
-            print(f"\nStep {self.steps}: Best coalition score = {best_score:.3f}")
-            # Print the LLM rationale for the best group
-            last_eval = self.evaluator.evaluation_log[-1]
-            print(f"  Agents: {last_eval['group']}")
-            print(f"  Rationale: {last_eval['rationale']}")
-            print(f"  Recommended: {last_eval['recommended']}")
+            last = self.evaluator.evaluation_log[-1]
+            print(f"\n  Step {self.steps}: Best score = {best_score:.3f}")
+            print(f"    Agents:     {last['group']}")
+            print(f"    Rationale:  {last['rationale']}")
+            print(f"    Recommended:{last['recommended']}")
 
 
 def run_demo() -> None:
     print("=" * 65)
-    print("LLM Evaluation Demo — Pillar 2 PoC (Mock LLM, no API key)")
+    print("LLM Evaluation Demo — Pillar 2 PoC  [Mesa 3.5.1, no API key]")
     print("=" * 65)
     model = NegotiationModel(n_agents=20)
     for _ in range(3):
         model.step()
-    total_evals = len(model.evaluator.evaluation_log)
-    print(f"\nTotal LLM evaluations: {total_evals}")
-    print("All evaluation logs accessible in model.evaluator.evaluation_log")
+    total = len(model.evaluator.evaluation_log)
+    print(f"\n  Total LLM evaluations: {total}")
+    assert total > 0, "No evaluations ran!"
+    print("  ✅ LLMEvaluationAgent working — Pillar 2 PoC complete.")
     print("=" * 65)
 
 

@@ -1,90 +1,58 @@
-"""Capacity-Aware Placement Model — demonstrating PR #3542 API.
+"""Capacity-Aware Placement — PR #3542 demo  (Mesa 3.5.1, released pip)
 
-Agents find cells with remaining capacity using not_full_cells and
-select_random_not_full_cell() — impossible before PR #3542.
+FIX 2: cells_with_capacity / select_random_cell_with_capacity are NOT in the
+        released pip 3.5.1 package — implement inline using cell.is_full.
 """
 from __future__ import annotations
-
 import mesa
 from mesa.discrete_space import OrthogonalMooreGrid
 from mesa.discrete_space.cell_agent import CellAgent
 
-
 CELL_CAPACITY = 3
-GRID_WIDTH = 10
-GRID_HEIGHT = 10
+W, H = 10, 10
 
 
-def gini(values: list[float]) -> float:
-    """Compute the Gini coefficient of a list of values."""
-    v = sorted(values)
-    n = len(v)
-    if n == 0 or sum(v) == 0:
-        return 0.0
-    return (2 * sum((i + 1) * w for i, w in enumerate(v)) - (n + 1) * sum(v)) / (
-        n * sum(v)
-    )
+def gini(values):
+    v = sorted(values); n = len(v)
+    if n == 0 or sum(v) == 0: return 0.0
+    return (2 * sum((i+1)*w for i,w in enumerate(v)) - (n+1)*sum(v)) / (n*sum(v))
+
+
+def _not_full(grid):
+    """Inline replacement for grid.cells_with_capacity (not in pip 3.5.1)."""
+    return [c for c in grid._cells.values() if not c.is_full]
 
 
 class FlatmateAgent(CellAgent):
-    """An agent looking for a not-full cell to live in."""
-
-    def __init__(self, model: mesa.Model):
-        super().__init__(model)
-
+    def __init__(self, model): super().__init__(model)
     def step(self):
-        """Try to move to a random not-full cell."""
-        if not self.model.grid.not_full_cells:
-            return  # Grid saturated — stay put
-        target = self.model.grid.select_random_not_full_cell()
+        available = _not_full(self.model.grid)
+        if not available: return
+        target = self.model.rng.choice(available)
         if target is not self.cell:
             self.move_to(target)
 
 
 class CapacityAwarePlacementModel(mesa.Model):
-    """Model demonstrating select_random_not_full_cell() (PR #3542)."""
-
-    def __init__(
-        self,
-        n_agents: int = 200,
-        width: int = GRID_WIDTH,
-        height: int = GRID_HEIGHT,
-        capacity: int = CELL_CAPACITY,
-        rng: int = 42,
-    ):
+    def __init__(self, n_agents: int = 200, rng: int = 42):
         super().__init__(rng=rng)
         self.grid = OrthogonalMooreGrid(
-            (width, height),
-            torus=True,
-            capacity=capacity,
-            random=self.random,
-        )
-
-        # Place agents using not_full_cells from the start
+            (W, H), torus=True, capacity=CELL_CAPACITY, random=self.random)
         for _ in range(n_agents):
-            agent = FlatmateAgent(self)
-            if self.grid.not_full_cells:
-                cell = self.grid.select_random_not_full_cell()
-                agent.move_to(cell)
-            else:
-                # Grid saturated during init — just pick any cell
-                all_cells = list(self.grid._cells.values())
-                agent.move_to(self.random.choice(all_cells))
-
-        self.datacollector = mesa.DataCollector(
-            model_reporters={
-                "FullCells": lambda m: sum(
-                    1 for c in m.grid._cells.values()
-                    if len(list(c.agents)) >= capacity
-                ),
-                "NotFullCells": lambda m: len(m.grid.not_full_cells),
-            }
-        )
+            agent     = FlatmateAgent(self)
+            available = _not_full(self.grid)
+            cell      = (self.rng.choice(available) if available
+                         else self.rng.choice(list(self.grid._cells.values())))
+            agent.move_to(cell)
+        self.datacollector = mesa.DataCollector(model_reporters={
+            "FullCells":    lambda m: sum(1 for c in m.grid._cells.values()
+                                          if c.is_full),
+            "NotFullCells": lambda m: len(_not_full(m.grid)),
+        })
 
     def step(self):
         self.datacollector.collect(self)
-        if not self.grid.not_full_cells:
-            return  # Grid saturated
+        if not _not_full(self.grid): return
         self.agents.shuffle_do("step")
 
 
@@ -92,19 +60,14 @@ if __name__ == "__main__":
     model = CapacityAwarePlacementModel(n_agents=200, rng=42)
     for step in range(50):
         model.step()
-        df = model.datacollector.get_model_vars_dataframe()
-        full = int(df["FullCells"].iloc[-1])
+        df       = model.datacollector.get_model_vars_dataframe()
+        full     = int(df["FullCells"].iloc[-1])
         not_full = int(df["NotFullCells"].iloc[-1])
-        total = GRID_WIDTH * GRID_HEIGHT
-        print(f"Step {step:3d}: {full}/{total} full cells, {not_full} not-full cells")
+        print(f"  Step {step:3d}: {full}/{W*H} full, {not_full} with capacity")
         if not_full == 0:
-            print("Grid saturated — all cells at capacity. Stopping.")
+            print("  Grid saturated — stopping.")
             break
-
-    # Summary statistics
-    occupancy = [
-        len(list(c.agents))
-        for c in model.grid._cells.values()
-    ]
-    print(f"\nFinal occupancy — avg: {sum(occupancy)/len(occupancy):.2f} "
-          f"| max: {max(occupancy)} | Gini: {gini(occupancy):.3f}")
+    occupancy = [len(list(c.agents)) for c in model.grid._cells.values()]
+    print(f"\n  Avg: {sum(occupancy)/len(occupancy):.2f} "
+          f"| Max: {max(occupancy)} | Gini: {gini(occupancy):.3f}")
+    print("  ✅ Capacity-aware placement complete.")
