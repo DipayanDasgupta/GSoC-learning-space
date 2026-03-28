@@ -55,3 +55,13 @@ over 50 steps converged to ~0.8, matching theoretical predictions.
 
 Add a `DataCollector` from the start to track Gini per step and plot
 the convergence curve rather than computing it only at the end.
+
+## Connection to GSoC Proposal (Pillar 1)
+
+The Boltzmann model uses a fixed activation pattern — every agent acts once
+per step. The Mesa-LLM PoC (`mesa_llm_poc/`) extends this pattern: rather than
+calling wealth-exchange logic, agents call `engine.batch_invoke(prompts)` and
+store the LLM responses in per-agent vector memory. The two-phase step
+(collect prompts → fire → distribute) demonstrated in
+`mesa_llm_poc/demo/misinformation_spread.py` maps directly onto this model's
+`model.step()` structure.

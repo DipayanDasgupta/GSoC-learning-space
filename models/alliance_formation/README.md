@@ -48,3 +48,13 @@ Understanding the type signature of `filter_func` — it takes
 `list[tuple[tuple[Agent, ...], float]]` and returns the same type.
 Reading the existing tests in `test_meta_agents.py` was more useful
 than the docstring for understanding this.
+
+## Connection to GSoC Proposal (Pillar 2)
+
+The alliance evaluation function `alliance_value(group) -> float` is structurally
+identical to a LangGraph node: it takes a group (state) and returns a score
+(action). In the PoC, `MockCompiledGraph.invoke(state) -> dict` plays the same
+role — transforming state to scored action — but with LLM reasoning replacing
+the deterministic scoring function. PR #3567's type validation ensures the
+evaluation function returns a numeric value; the same invariant applies to
+LangGraph nodes that must return a valid action.
