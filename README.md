@@ -1,114 +1,75 @@
-# Mesa GSoC Learning Space — Dipayan Dasgupta
+# GSoC 2026 Learning Space — Dipayan Dasgupta
 
-> **GSoC 2026 Proposal:** *Persistent Vector Memory, LangGraph Integration,
-> and Async API Infrastructure for Mesa-LLM*
+> **IIT Madras · Civil Engineering (B.Tech, Expected 2028)**  
+> GSoC 2026 Applicant · Project: **Mesa Meta Agents**  
+> Mentors: Tom Pike / Ewout
 
----
+## About This Repository
 
-## About me
+This learning space documents my journey from zero to GSoC-ready with Mesa.
+It contains original ABM models, proof-of-concept implementations for my
+proposal pillars, and investigations that directly motivated my Mesa pull requests.
 
-B.Tech (Civil Engineering) sophomore at **IIT Madras**, applying for
-Google Summer of Code 2026 with **Mesa** on the **Mesa-LLM** project.
-
-Background: quantitative finance simulations (IMC Prosperity Trading
-Challenge 2025 — Global Rank 66 / 12,000+ teams; India Rank 9;
-Goldman Sachs India Hackathon 2025 — AIR 5), competitive programming
-(Codeforces Specialist, max 1575), and full-stack AI/ML engineering.
-
-- **Email:** deep.dasgupta2006@gmail.com
-- **GitHub:** [DipayanDasgupta](https://github.com/DipayanDasgupta)
-- **Proposal focus:** Three independently deployable extensions to the
-  2025 Mesa-LLM baseline — vector memory, LangGraph integration, and
-  async batch invocation.
-
----
-
-## Mesa Contributions
+## My Mesa Contributions
 
 ### Merged Pull Requests
 
-| PR | Repository | Description | What I learned |
-|----|-----------|-------------|----------------|
-| [#3627](https://github.com/mesa/mesa/pull/3627) | mesa | Fix `Sheep.feed()` `StopIteration` crash when `grass=False` | `next(gen)` vs `next(gen, default)`; Mesa DataCollector is conditionally dynamic — downstream viz must never assume every key exists |
-| [#3542](https://github.com/mesa/mesa/pull/3542) | mesa | Add `Grid.not_full_cells` + `select_random_not_full_cell()` | Difference between `cell.empty` and `not cell.is_full`; maintained property layers beat lazy computation in hot paths |
-| [#3544](https://github.com/mesa/mesa/pull/3544) | mesa | Fix `VoronoiGrid` silently overwriting user-provided `capacity` | Private methods in `DiscreteSpace` that mutate cell state must respect constructor contracts; motivated the `MesaToolkit` atomic write design |
-| [#3014](https://github.com/mesa/mesa/pull/3014) | mesa | Fix infinite loop in `select_random_empty_cell` on full grid | `_empties` property layer architecture across all Grid subclasses; heuristic fallback pattern |
-| [#3011](https://github.com/mesa/mesa/pull/3011) | mesa | Consolidate Solara + Altair CI test coverage | `SpaceRenderer` backend dispatch; pluggable visualisation architecture |
-| [#21](https://github.com/mesa/mesa-llm/pull/21) | mesa-llm | First pytest suite for `Reasoning` base class | Provider-agnostic `invoke` interface; mock pattern for network-free CI |
+| PR | Title | What it taught me |
+|----|-------|-------------------|
+| [#3627](https://github.com/projectmesa/mesa/pull/3627) | Fix `Sheep.feed()` crash when `grass=False` | Safe generator defaults; conditional DataCollector reporters |
+| [#3542](https://github.com/projectmesa/mesa/pull/3542) | Add `Grid.not_full_cells` and `select_random_not_full_cell()` | Capacity vs. emptiness semantics; hot-path property layers |
+| [#3544](https://github.com/projectmesa/mesa/pull/3544) | Fix `VoronoiGrid` silently overwriting user `capacity` | Private method contracts in DiscreteSpace hierarchy |
+| [#3014](https://github.com/projectmesa/mesa/pull/3014) | Fix infinite loop in `select_random_empty_cell` | Heuristic fallback pattern for grid queries |
+| [#3011](https://github.com/projectmesa/mesa/pull/3011) | CI/test consolidation: Solara + Altair coverage | Test organisation across parametrised backends |
+| [Mesa-LLM #21](https://github.com/projectmesa/mesa-llm/pull/21) | Pytest suite for `Reasoning` base class | Mock LLM pattern for network-free CI; `invoke()` interface |
 
-### Open Pull Requests (under review)
+### Open Pull Requests
 
-| PR | Description |
-|----|-------------|
-| [#3567](https://github.com/mesa/mesa/pull/3567) | Type validation in `evaluate_combination` (`meta_agents`) — removes dead null check, adds actionable `TypeError` at call site |
-| [#3283](https://github.com/mesa/mesa/pull/3283) | Migrate core examples from deprecated `draw_agents()` to `SpaceRenderer.render()` |
-| [#3013](https://github.com/mesa/mesa/pull/3013) | Restore CI coverage reporting + codecov upload |
+| PR | Title | Status |
+|----|-------|--------|
+| [#3567](https://github.com/projectmesa/mesa/pull/3567) | Type validation in `evaluate_combination` (`meta_agents`) | Open, CI passing |
+| [#3283](https://github.com/projectmesa/mesa/pull/3283) | Refactor core examples to new `SpaceRenderer` API | Open |
+| [#3013](https://github.com/projectmesa/mesa/pull/3013) | CI coverage reporting restoration | Open |
 
-### Issues Opened & Diagnosed
+### Issues Diagnosed
 
 | Issue | Description |
 |-------|-------------|
-| [#3597](https://github.com/mesa/mesa/issues/3597) | WolfSheep grass=False crash (→ fixed in PR #3627) |
-| [#3541](https://github.com/mesa/mesa/issues/3541) | `Grid.empties` unusable with `capacity > 1` (→ fixed in PR #3542) |
-| [#3543](https://github.com/mesa/mesa/issues/3543) | VoronoiGrid ignores user `capacity` (→ fixed in PR #3544) |
-| [#3566](https://github.com/mesa/mesa/issues/3566) | `evaluate_combination` silent non-numeric return (→ PR #3567) |
-| [#3282](https://github.com/mesa/mesa/issues/3282) | Core examples emit `FutureWarning` on deprecated renderer API (→ PR #3283) |
+| [#3566](https://github.com/projectmesa/mesa/issues/3566) | `evaluate_combination` accepts non-numeric return values silently |
+| [#3541](https://github.com/projectmesa/mesa/issues/3541) | Grid has no API for partial-capacity queries |
+| [#3543](https://github.com/projectmesa/mesa/issues/3543) | VoronoiGrid silently overwrites user-provided capacity |
+| [#3597](https://github.com/projectmesa/mesa/issues/3597) | WolfSheep crashes with StopIteration when grass=False |
+| [#3282](https://github.com/projectmesa/mesa/issues/3282) | Core examples use deprecated draw_agents() |
 
----
+## GSoC 2026 Proposal: Mesa Meta Agents
 
-## Models Built
+**Project slot:** Meta Agents (Medium, 175 hours) — Tom Pike / Ewout  
+**Goal:** Graduate `mesa.experimental.meta_agents` to production with three pillars:
 
-| Model | Directory | Key Mesa features | Connected PR |
-|-------|-----------|-------------------|-------------|
-| Boltzmann Wealth | `models/boltzmann_wealth/` | `OrthogonalMooreGrid`, `CellAgent`, `shuffle_do` | #3542 |
-| Alliance Formation | `models/alliance_formation/` | `find_combinations`, `evaluate_combination`, `meta_agents` | #3567 |
-| Wolf-Sheep Investigation | `models/wolf_sheep_investigation/` | `WolfSheep`, `Solara`, `DataCollector` | #3627 |
-| Voronoi Capacity | `models/voronoi_capacity/` | `VoronoiGrid`, `capacity`, `CellFullException` | #3544 |
-| Capacity-Aware Placement | `models/capacity_aware_placement/` | `select_random_not_full_cell`, `not_full_cells` | #3542 |
-| SpaceRenderer Migration | `models/spacerenderer_migration/` | `SpaceRenderer.render()`, deprecated API removal | #3283 |
+| Pillar | Description | Key PRs |
+|--------|-------------|---------|
+| 1. Production Hardening | Fix agent-count bugs, add lifecycle API (join/leave/merge/split), complete test suite | #3567, #3627 |
+| 2. LLM-Powered Evaluation | `LLMEvaluationAgent` wrapping `mesa_llm.ReasoningAgent` with Pydantic validation | Mesa-LLM #21 |
+| 3. DiscreteSpace-Aware Formation | `spatial_find_combinations()` filtering candidates to spatial neighbourhoods | #3542, #3544 |
 
----
+## Models in This Repository
 
-## Proof-of-Concept: Mesa-LLM Pillars
+| Directory | Description | Proposal Pillar |
+|-----------|-------------|-----------------|
+| `models/meta_agents_poc/` | Lifecycle demo: join, leave, merge, split operations | Pillar 1 |
+| `models/llm_evaluation_demo/` | LLM coalition evaluation with mock client | Pillar 2 |
+| `models/spatial_coalition/` | Spatial candidate filtering: 97% search space reduction | Pillar 3 |
+| `models/financial_market_coalition/` | All 3 pillars: market-makers on OrthogonalMooreGrid | All pillars |
+| `models/alliance_formation/` | meta_agents investigation (motivated PR #3567) | Background |
+| `models/boltzmann_wealth/` | Capacity-aware placement (motivated PR #3542) | Background |
+| `models/wolf_sheep_investigation/` | grass=False bug investigation (motivated PR #3627) | Background |
 
-The `mesa_llm_poc/` directory contains working PoCs of all three proposed GSoC pillars:
+## Motivation
 
-| Module | Description |
-|--------|-------------|
-| `mesa_llm_poc/vector_memory.py` | Per-agent FAISS-backed semantic memory with retrieval |
-| `mesa_llm_poc/async_engine.py` | Token-bucket rate limiter + exponential-backoff batch caller |
-| `mesa_llm_poc/langgraph_agent.py` | Thin LangGraph wrapper + `MesaToolkit` spatial tool nodes |
-| `mesa_llm_poc/demo/misinformation_spread.py` | Full demo model composing all three pillars |
+See [motivation.md](motivation.md) for the full narrative.
 
-Run the demo (no LLM API key needed — uses mocked completions):
-```bash
-cd mesa_llm_poc
-pip install -e ".[dev]"     # installs mesa, faiss-cpu, langgraph
-python demo/misinformation_spread.py
-```
+## Contact
 
-See [`mesa_llm_poc/README.md`](mesa_llm_poc/README.md) for full architecture
-explanation and feasibility analysis.
-
----
-
-## Repository Structure
-
-```
-GSoC-learning-space/
-├── models/
-│   ├── boltzmann_wealth/
-│   ├── alliance_formation/
-│   ├── wolf_sheep_investigation/
-│   ├── voronoi_capacity/          ← new, PR #3544
-│   ├── capacity_aware_placement/  ← new, PR #3542
-│   └── spacerenderer_migration/   ← new, PR #3283
-├── mesa_llm_poc/                  ← GSoC proposal PoC
-│   ├── vector_memory.py
-│   ├── async_engine.py
-│   ├── langgraph_agent.py
-│   └── demo/
-│       └── misinformation_spread.py
-├── motivation.md
-└── README.md
-```
+- **Email:** deep.dasgupta2006@gmail.com  
+- **GitHub:** [DipayanDasgupta](https://github.com/DipayanDasgupta)  
+- **LinkedIn:** [dipayan-dasgupta-24a24719b](https://linkedin.com/in/dipayan-dasgupta-24a24719b)

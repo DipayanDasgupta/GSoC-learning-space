@@ -1,100 +1,63 @@
-# Why I Want to Work on Mesa-LLM
+# Motivation: From Quantitative Finance to Mesa Meta Agents
 
-## The trading-desk origin story
+## The Problem I Kept Running Into
 
-My path to Mesa-LLM did not start in academia — it started in a terminal,
-staring at order-book data during the **IMC Prosperity Trading Challenge 2025**
-(Global Rank 66 / 12,000+ teams; India Rank 9) and the **Goldman Sachs India
-Hackathon 2025** (AIR 5, national level). Both competitions required building
-simulation environments where artificial agents interact under uncertainty,
-incomplete information, and non-linear feedback loops. I built those
-environments from scratch, and I ran into the same wall every time: the agents
-were rigid. Their decision functions were lookup tables or hand-crafted
-heuristics. They could not *reason*. They could not update beliefs based on the
-history of what other agents had said or done. When conditions shifted, they
-broke.
+Competing in the **IMC Prosperity Trading Challenge 2025** (Global Rank 66,
+India Rank 9, 12,000+ teams) and the **Goldman Sachs India Hackathon 2025**
+(AIR 5, National Level) forced me to solve the same problem repeatedly:
+dynamic group formation under uncertainty.
 
-Agent-Based Modelling gave me the vocabulary to formalise what I was already
-building. Mesa gave me the infrastructure. But even within Mesa, the agents I
-could construct were behaviourally shallow — a `step()` is a deterministic
-rule, not a deliberative process. I could model *what* agents do, but not *how
-they think about what to do*.
+Market-makers form syndicates with spatial neighbours to pool liquidity. These
+syndicates break when prices move against them and re-form on the next
+opportunity — within microseconds. I wrote coalition-detection routines by hand:
+brute-force `itertools.combinations` loops, hand-coded scoring functions,
+fragile dissolution logic that broke when an agent died mid-coalition.
 
-## The Mesa-LLM moment
+When I discovered `mesa.experimental.meta_agents`, I recognised what it was
+trying to do — and exactly what it was missing.
 
-When I read the 2025 GSoC Mesa-LLM project and the `Reasoning` base class it
-introduced, something clicked. LLMs don't just answer questions — they can
-serve as a **bounded-rationality engine** for simulation agents. A
-`ReasoningAgent` backed by GPT-4o or an open-weights model can evaluate context
-clues, weigh conflicting evidence, and produce adaptive behaviour. That is
-exactly the kind of cognitive richness that makes Agent-Based Modelling
-interesting in the first place.
+## Why Mesa
 
-But the 2025 Mesa-LLM baseline has three gaps that make research-scale
-simulations impossible:
+I started contributing to Mesa not to build a resume, but because I kept
+running into bugs while building models. Every PR I opened was preceded by
+an issue I diagnosed myself:
 
-1. **Ephemeral memory** — agents lose all context beyond a fixed window length.
-   In a 500-step simulation, early interactions are silently discarded. An agent
-   deciding whether to trust a rumour cannot recall the first time it heard that
-   rumour fifty steps ago.
+- **PR #3014**: Infinite loop in `select_random_empty_cell` — found while
+  building a population model.
+- **PR #3542**: No API for partial-capacity queries — found while trying to
+  place agents into cells with `capacity=2`.
+- **PR #3544**: VoronoiGrid silently overwriting capacity — found while
+  building a geographic coalition model.
+- **PR #3567**: `evaluate_combination` accepting non-numeric values — found
+  while building the Alliance Formation model in this repository.
 
-2. **No cyclic reasoning** — single-shot prompt→response cycles cannot capture
-   *plan, observe, verify, revise* workflows. Real deliberation is iterative.
+This pattern — find a bug, diagnose it, fix it, add a test — is exactly the
+discipline that production-hardening `meta_agents` requires.
 
-3. **O(N) step latency** — 100 synchronous LLM calls per step, at 1 s/call,
-   means 100 seconds per model step. This is not a simulation; it is a batch job.
+## Why Meta Agents, Not Mesa-LLM
 
-These gaps are not cosmetic. They are the reason Mesa-LLM cannot yet be used
-for the class of social-science and economic research that motivated its
-creation. Closing them is the core of my proposal.
+The Mesa-LLM GSoC 2026 project is explicitly scoped to "push to production" —
+stability, structured output, error handling. Important work, but narrowly
+defined by the maintainers, and highly competitive.
 
-## Why I am the right person
+The Meta Agents slot is where my specific combination of skills creates
+differentiated value:
+1. My quant finance background maps directly onto coalition formation problems.
+2. My DiscreteSpace PRs (#3542, #3544) are the precise infrastructure that
+   spatial-aware `meta_agents` requires.
+3. My Mesa-LLM PR #21 means I have read every line of `ReasoningAgent` — the
+   class I am proposing to wrap in `LLMEvaluationAgent`.
+4. My PR #3567 means I have read every line of `meta_agents` — the module I
+   am proposing to graduate from experimental.
 
-I have spent the past several months building the Mesa codebase familiarity
-needed to execute this:
+Nobody else is connecting these dots.
 
-- **PR #3627** (merged): Diagnosed and fixed `Sheep.feed()` crash (`StopIteration`
-  on bare generator) when `grass=False` — a bug that made a non-default
-  configuration completely unusable. Added regression test.
-- **PR #3542** (merged): Added `Grid.not_full_cells` and
-  `select_random_not_full_cell()` — filling a genuine gap in Mesa's capacity API
-  that I discovered while building the Boltzmann model.
-- **PR #3544** (merged): Fixed `VoronoiGrid` silently overwriting user-provided
-  `capacity` — a silent correctness bug that made the `capacity` parameter a
-  no-op on Voronoi grids.
-- **PR #3014** (merged): Fixed infinite loop in `select_random_empty_cell` when
-  the grid is full — traced through the `_empties` property layer and added a
-  heuristic early-exit guard.
-- **PR #3011** (merged): Consolidated Solara and Altair CI test coverage.
-- **Mesa-LLM PR #21** (merged): Added pytest coverage for the `Reasoning` base
-  class — the first unit tests for the 2025 LLM integration.
+## The Novel Intersection
 
-Beyond code: I competed nationally in quantitative finance environments that
-require exactly the kind of state-driven, multi-agent reasoning Mesa-LLM aims
-to enable. I understand the *use case* from both ends.
+The key insight: `evaluate_combination()` expects a callable that returns a
+float. An `LLMEvaluationAgent` is a callable that (1) describes the candidate
+group in natural language, (2) invokes `ReasoningAgent.invoke()`, and (3)
+extracts a score via Pydantic validation.
 
-## What I hope to build
-
-A Mesa-LLM that researchers can actually use at scale:
-
-- Agents that remember the entire simulation history, not just the last few
-  messages, using per-agent FAISS / ChromaDB vector indices.
-- Complex, cyclic reasoning workflows via native LangGraph integration —
-  wrapping Mesa's spatial environment as callable tool nodes.
-- Step latency that grows as O(⌈N/C⌉ · L) rather than O(N · L) via an
-  async batch engine with token-bucket rate limiting and exponential-backoff
-  retry on HTTP 429.
-
-The culminating example — a Misinformation Spread simulation — exercises all
-three pillars in a single model and will be contributed to `mesa-examples` with
-a tutorial notebook. It is a direct descendant of the 2025 Sales Agent example,
-showing reviewers exactly what was added and why it matters.
-
-## Long-term commitment
-
-I am not here just for the summer. I already review other contributors' PRs,
-help diagnose issues in the Matrix channel, and have my own open issues
-(#3541, #3543, #3566, #3282) that I am driving to resolution. The Mesa
-community is the kind of place where rigorous software engineering and
-scientific curiosity reinforce each other, and that is exactly the environment
-I want to grow in.
+This is the first integration of Mesa's group-formation primitive with the
+2025 Mesa-LLM infrastructure. It did not exist before this proposal.
