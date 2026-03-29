@@ -103,7 +103,7 @@ class MarketMaker(CellAgent):                                  # FIX 1: was mesa
 
 class MarketModel(mesa.Model):
     def __init__(self, n_agents: int = 50, seed: int = 42) -> None:
-        super().__init__(seed=seed)
+        super().__init__(rng=seed)
         self.grid      = OrthogonalMooreGrid(
             (10, 10), capacity=2, torus=False, random=self.random)
         self.evaluator = MarketMakerEvaluator(MockLLM())
@@ -125,7 +125,7 @@ class MarketModel(mesa.Model):
             best_group, best_score = max(combos, key=lambda x: x[1])
             if best_score > 0.6:
                 syn = Syndicate(self, best_group)
-                print(f"  Step {self.steps}: Syndicate {syn.unique_id} "
+                print(f"  Step {self.time}: Syndicate {syn.unique_id} "
                       f"(score={best_score:.2f})")
                 if self.evaluator.log:
                     print(f"    {self.evaluator.log[-1]['rationale']}")

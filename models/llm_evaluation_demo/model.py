@@ -106,7 +106,7 @@ class NegotiationModel(mesa.Model):
     """20 agents form coalitions scored by a mock LLM."""
 
     def __init__(self, n_agents: int = 20, seed: int = 42) -> None:
-        super().__init__(seed=seed)
+        super().__init__(rng=seed)
         choices = ["high", "medium", "low"]
         NegotiationAgent.create_agents(
             self, n_agents,
@@ -130,7 +130,7 @@ class NegotiationModel(mesa.Model):
         if combos:
             best_group, best_score = max(combos, key=lambda x: x[1])
             last = self.evaluator.evaluation_log[-1]
-            print(f"\n  Step {self.steps}: Best score = {best_score:.3f}")
+            print(f"\n  Step {self.time}: Best score = {best_score:.3f}")
             print(f"    Agents:     {last['group']}")
             print(f"    Rationale:  {last['rationale']}")
             print(f"    Recommended:{last['recommended']}")
