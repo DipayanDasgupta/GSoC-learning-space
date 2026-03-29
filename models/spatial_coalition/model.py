@@ -87,7 +87,7 @@ class SpatialCoalitionModel(mesa.Model):
     """Benchmark naive vs. spatial coalition candidate counts."""
 
     def __init__(self, n_agents: int = 200, seed: int = 42) -> None:
-        super().__init__(seed=seed)
+        super().__init__(rng=seed)
         self.grid = OrthogonalMooreGrid(
             (20, 20), capacity=2, torus=False, random=self.random  # FIX: random= not rng=
         )

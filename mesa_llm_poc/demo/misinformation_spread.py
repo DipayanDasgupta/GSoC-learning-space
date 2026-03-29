@@ -54,7 +54,7 @@ class CitizenAgent(CellAgent):
 
     # ── Pillar 2: per-agent graph invocation ─────────────────────────────────
     def observe(self) -> str:
-        step = self.model.steps
+        step = self.model.time
         nb_ids = [
             n["unique_id"] for n in
             self.model.toolkit.get_neighbours(self.unique_id)
@@ -81,7 +81,7 @@ class CitizenAgent(CellAgent):
         believing = sum(1 for uid in nb_ids
                         if self.model.belief_map.get(uid, False))
         return (
-            f"[Agent {self.unique_id} | Step {self.model.steps}]\n"
+            f"[Agent {self.unique_id} | Step {self.model.time}]\n"
             f"Memory context:\n{context}\n"
             f"Neighbours believing: {believing}\n"
             f"Is the claim credible?"
@@ -92,7 +92,7 @@ class CitizenAgent(CellAgent):
         self.believes_claim = "credible" in response.lower()
         self.memory.store(
             agent_id=self.unique_id,
-            step=self.model.steps,
+            step=self.model.time,
             text=response,
         )
 

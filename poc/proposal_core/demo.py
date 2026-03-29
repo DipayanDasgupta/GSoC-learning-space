@@ -62,7 +62,7 @@ class MarketCoalitionModel(mesa.Model):
 
     def __init__(self, n_makers: int = 30, grid_size: int = 8,
                  seed: int = 42) -> None:
-        super().__init__(seed=seed)
+        super().__init__(rng=seed)
 
         self.grid = OrthogonalMooreGrid(
             (grid_size, grid_size), capacity=2, torus=False, random=self.random

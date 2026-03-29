@@ -5,15 +5,9 @@
 #   bash run_all_models.sh
 #   bash run_all_models.sh 2>&1 | tee run_results.txt
 #
-# What it does:
-#   - Runs all 7 non-Solara Python models with a per-model timeout
-#   - Prints their full stdout output (for proposal PoC sections)
-#   - Prints a PASS/FAIL summary at the end
-#   - Exits 0 if all pass, 1 if any fail
-#
-# No API key required. No Solara UI is launched.
-# Expected total runtime: < 90 seconds
+# Updated for current directory structure (March 2026)
 # =============================================================================
+
 set -euo pipefail
 
 # ── Colour codes ──────────────────────────────────────────────────────────────
@@ -28,8 +22,8 @@ TIMEOUT=60   # seconds per model
 
 PASS_COUNT=0
 FAIL_COUNT=0
-declare -A RESULTS   # model_name -> PASS|FAIL
-declare -A OUTPUTS   # model_name -> captured stdout
+declare -A RESULTS
+declare -A OUTPUTS
 
 # ── Helper: run one model ─────────────────────────────────────────────────────
 run_model() {
@@ -46,7 +40,7 @@ run_model() {
 
   if [ ! -f "$script" ]; then
     echo -e "${RED}  ERROR: $script not found — skipping${RESET}"
-    RESULTS["$name"]="FAIL"
+    RESULTS["$name"]="FAIL (file missing)"
     OUTPUTS["$name"]="File not found: $script"
     FAIL_COUNT=$((FAIL_COUNT + 1))
     return
@@ -83,97 +77,113 @@ run_model() {
 
 # ── Safety check ──────────────────────────────────────────────────────────────
 if [ ! -d "models" ]; then
-  echo "ERROR: Run this script from the root of GSoC-learning-space"
+  echo -e "${RED}ERROR: Run this script from the root of GSoC-learning-space${RESET}"
   echo "  cd ~/GSoC-learning-space && bash run_all_models.sh"
   exit 1
 fi
 
 echo -e "${BOLD}"
 echo "═══════════════════════════════════════════════════════════════════"
-echo "  GSoC Learning Space — Model Test Runner"
-echo "  Dipayan Dasgupta | IIT Madras | Mesa Meta Agents Proposal"
+echo "  GSoC 2026 Learning Space — Model Test Runner"
+echo "  Dipayan Dasgupta | Mesa Meta Agents"
 echo "  $(date)"
 echo "═══════════════════════════════════════════════════════════════════"
 echo -e "${RESET}"
 
-# ── Check Python environment ──────────────────────────────────────────────────
+# Check Mesa version
 echo -e "${YELLOW}Checking environment...${RESET}"
 python --version
-echo "Working directory: $(pwd)"
-
-# Check mesa is importable
 if python -c "import mesa; print(f'Mesa version: {mesa.__version__}')" 2>/dev/null; then
   echo -e "${GREEN}Mesa installed correctly${RESET}"
 else
-  echo -e "${RED}WARNING: mesa not importable. Run: pip install mesa${RESET}"
+  echo -e "${RED}WARNING: mesa not importable${RESET}"
 fi
 
-# ── Run proposal PoC models ──────────────────────────────────────────────────
+# ── 1. Proposal Core Models ───────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}═══ PROPOSAL PoC MODELS ═══════════════════════════════════════════${RESET}"
+echo -e "${BOLD}═══ PROPOSAL CORE MODELS ══════════════════════════════════════════${RESET}"
 
 run_model \
-  "Pillar 1: Meta Agents Lifecycle" \
+  "MetaAgentV2 Core (Proposal)" \
+  "poc/proposal_core/demo.py" \
+  "Core lifecycle: join/leave/merge/split with MetaAgentV2"
+
+run_model \
+  "Pillar 2: LLM Evaluation (Proposal)" \
+  "poc/proposal_core/tests/test_llm_eval.py" \
+  "LLM evaluation tests with Pydantic validation"
+
+run_model \
+  "Pillar 3: Spatial Coalition (Proposal)" \
+  "poc/proposal_core/tests/test_spatial.py" \
+  "Spatial find_combinations with capacity-aware cells"
+
+# ── 2. Main Demo Models ───────────────────────────────────────────────────────
+echo ""
+echo -e "${BOLD}═══ MAIN DEMO MODELS ══════════════════════════════════════════════${RESET}"
+
+run_model \
+  "Pillar 1: Meta Agents POC" \
   "models/meta_agents_poc/model.py" \
-  "Tests join/leave/dissolve lifecycle API. Shows Pillar 1 design."
+  "Basic MetaAgent lifecycle demonstration"
 
 run_model \
   "Pillar 2: LLM Evaluation Demo" \
   "models/llm_evaluation_demo/model.py" \
-  "LLMEvaluationAgent with MockLLM. No API key needed. Shows Pillar 2."
+  "LLMEvaluationAgent with MockLLM (currently failing — needs fix)"
 
 run_model \
   "Pillar 3: Spatial Coalition" \
   "models/spatial_coalition/model.py" \
-  "spatial_find_combinations() candidate count benchmark. Shows Pillar 3."
+  "spatial_find_combinations() benchmark"
 
 run_model \
-  "All Pillars: Financial Market" \
+  "All Pillars: Financial Market Coalition" \
   "models/financial_market_coalition/model.py" \
-  "All 3 pillars in one model: spatial syndicates + LLM scoring + lifecycle."
+  "Full integration: spatial + LLM scoring + agent lifecycle"
 
-# ── Run DiscreteSpace / bug-fix models ───────────────────────────────────────
+# ── 3. DiscreteSpace / PR Evidence Models ─────────────────────────────────────
 echo ""
-echo -e "${BOLD}═══ DISCRETE SPACE MODELS (PR EVIDENCE) ══════════════════════════${RESET}"
+echo -e "${BOLD}═══ DISCRETE SPACE & BUG-FIX MODELS (PR EVIDENCE) ════════════════${RESET}"
 
 run_model \
-  "Alliance Formation (PR #3567)" \
+  "Alliance Formation" \
   "models/alliance_formation/model.py" \
-  "find_combinations with ideology scoring. Motivated PR #3567."
+  "Motivated PR #3572 (evaluate_combination type validation)"
 
 run_model \
-  "Boltzmann Wealth (PR #3542)" \
+  "Boltzmann Wealth (Capacity Aware)" \
   "models/boltzmann_wealth/model.py" \
-  "Capacity-aware placement. Motivated PR #3542 (not_full_cells)."
+  "Motivated PR #3542 (not_full_cells)"
 
 run_model \
-  "Capacity-Aware Placement (PR #3542)" \
+  "Capacity-Aware Placement" \
   "models/capacity_aware_placement/model.py" \
-  "select_random_not_full_cell() lifecycle over 50 steps."
+  "Tests not_full_cells and select_random_not_full_cell()"
 
 run_model \
-  "Voronoi Capacity (PR #3544)" \
+  "VoronoiGrid Capacity Fix" \
   "models/voronoi_capacity/model.py" \
-  "VoronoiGrid capacity=1 enforcement. Verifies PR #3544 fix."
+  "Verifies PR #3544 (capacity not being overwritten)"
 
 run_model \
-  "SpaceRenderer Migration (PR #3283)" \
+  "SpaceRenderer Migration" \
   "models/spacerenderer_migration/model.py" \
-  "SpaceRenderer.render() API. Zero FutureWarning."
+  "Tests updated SpaceRenderer API"
 
 run_model \
-  "WolfSheep grass=False (PR #3627)" \
+  "Wolf-Sheep grass=False Fix" \
   "models/wolf_sheep_investigation/reproduce_3597.py" \
-  "Reproduces and confirms fix for grass=False StopIteration crash."
+  "Reproduces and validates grass=False fix"
 
-# ── Mesa-LLM PoC (no API key) ─────────────────────────────────────────────────
+# ── 4. Mesa-LLM PoC ───────────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}═══ MESA-LLM PoC ═══════════════════════════════════════════════════${RESET}"
+echo -e "${BOLD}═══ MESA-LLM PoC ══════════════════════════════════════════════════${RESET}"
 
 run_model \
-  "Misinformation Spread (All LLM Pillars)" \
+  "Misinformation Spread Demo" \
   "mesa_llm_poc/demo/misinformation_spread.py" \
-  "VectorMemory + AsyncEngine + LangGraphAgent composing. No API key."
+  "AsyncEngine + VectorMemory + LangGraphAgent"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
@@ -193,36 +203,18 @@ for name in "${!RESULTS[@]}"; do
 done | sort
 
 echo ""
-echo -e "  ${BOLD}Total: $TOTAL models | ${GREEN}$PASS_COUNT passed${RESET}${BOLD} | ${RED}$FAIL_COUNT failed${RESET}"
-echo ""
+echo -e "  ${BOLD}Total: $TOTAL models | ${GREEN}$PASS_COUNT passed${RESET} | ${RED}$FAIL_COUNT failed${RESET}${BOLD}"
 
 if [ "$FAIL_COUNT" -eq 0 ]; then
-  echo -e "${GREEN}${BOLD}  ✓ ALL MODELS PASSING — learning space verified clean${RESET}"
-  echo ""
-  echo "  Paste the outputs above into your GSoC proposal"
-  echo "  PoC sections as 'Verified Terminal Output' blocks."
+  echo -e "${GREEN}${BOLD}  ✓ ALL MODELS PASSING — Ready for proposal!${RESET}"
 else
-  echo -e "${RED}${BOLD}  ✗ $FAIL_COUNT FAILURES — fix before submitting proposal${RESET}"
+  echo -e "${RED}${BOLD}  ✗ Some models are failing — please fix before final submission${RESET}"
 fi
 
 echo ""
-echo -e "${BOLD}  To capture full output for your proposal:${RESET}"
-echo "  bash run_all_models.sh 2>&1 | tee run_results.txt"
-echo ""
-echo -e "${BOLD}  To run a single model:${RESET}"
-echo "  python models/meta_agents_poc/model.py"
-echo "  python models/llm_evaluation_demo/model.py"
-echo "  python models/spatial_coalition/model.py"
-echo "  python models/financial_market_coalition/model.py"
+echo -e "${BOLD}Next steps:${RESET}"
+echo "  • Fix the failing LLM Evaluation Demo (TypeError in mesa_signals)"
+echo "  • Run: bash run_all_models.sh 2>&1 | tee run_results.txt"
 echo ""
 
-# ── Quick install check if anything failed ────────────────────────────────────
-if [ "$FAIL_COUNT" -gt 0 ]; then
-  echo -e "${YELLOW}Troubleshooting: if you get ImportError, run:${RESET}"
-  echo "  pip install mesa"
-  echo "  pip install mesa[all]   # includes solara, altair"
-  echo ""
-  exit 1
-fi
-
-exit 0
+exit $((FAIL_COUNT > 0 ? 1 : 0))
