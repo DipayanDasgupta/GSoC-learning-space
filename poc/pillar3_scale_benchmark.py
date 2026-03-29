@@ -69,12 +69,12 @@ if __name__ == "__main__":
                (500,2),(500,3),(500,4)]
 
     for n, k in configs:
-        model = mesa.Model(seed=42)
+        model = mesa.Model()
         side  = max(10, int(n**0.5) + 2)
         grid  = OrthogonalMooreGrid((side, side), capacity=2,
                                     torus=False, random=model.random)
         GridWorker.create_agents(model, n,
-            value=[model.rng.uniform(0.1,1.0) for _ in range(n)])
+            value=[model.random.uniform(0.1,1.0) for _ in range(n)])
         avail = _not_full(grid)
         for i, agent in enumerate(model.agents):
             agent.move_to(avail[i % len(avail)])

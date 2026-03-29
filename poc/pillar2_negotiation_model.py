@@ -130,13 +130,14 @@ def find_combinations_flat(agents, size, evaluation_func, filter_func=None):
 
 class NegotiationModel(mesa.Model):
     def __init__(self):
-        super().__init__(seed=SEED)
+        super().__init__()
+        self.random = __import__('random').Random(SEED)
         self.evaluator = NegotiationEvaluator(MockLLM())
         NegAgent.create_agents(
             self, N_AGENTS,
-            ideology       = [self.rng.uniform(0,1) for _ in range(N_AGENTS)],
-            resources      = [self.rng.uniform(0,1) for _ in range(N_AGENTS)],
-            cooperativeness= [self.rng.uniform(0,1) for _ in range(N_AGENTS)],
+            ideology       = [self.random.uniform(0,1) for _ in range(N_AGENTS)],
+            resources      = [self.random.uniform(0,1) for _ in range(N_AGENTS)],
+            cooperativeness= [self.random.uniform(0,1) for _ in range(N_AGENTS)],
         )
         self.coalitions: list = []
         self.datacollector = mesa.DataCollector({
@@ -184,7 +185,7 @@ if __name__ == "__main__":
     if model.coalitions:
         best = max(model.coalitions, key=lambda c: c["score"])
         print(f"  Best coalition: agents {best['agents']}, score={best['score']:.3f}")
-        worst = model.audit_log[-1] if eval_.audit_log else None
+        worst = eval_.audit_log[-1] if eval_.audit_log else None
         if worst:
             print(f"  Last audit entry: {worst}")
     print()

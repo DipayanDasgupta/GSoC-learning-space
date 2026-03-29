@@ -120,7 +120,7 @@ def demo_bug_a():
     print("BUG A: RuntimeError on live-set iteration during dissolve()")
     print(SEP)
 
-    model = mesa.Model(seed=1)
+    model = mesa.Model()
     workers = list(Worker.create_agents(model, 5,
                     skill=[float(i) for i in range(5)]))
     coalition = MetaAgentUnfixed(model, workers[:3])
@@ -137,7 +137,7 @@ def demo_bug_a():
     assert raised, "Expected RuntimeError not raised"
 
     # Now the fixed path
-    model2 = mesa.Model(seed=1)
+    model2 = mesa.Model()
     workers2 = list(Worker.create_agents(model2, 5,
                      skill=[float(i) for i in range(5)]))
     c2 = MetaAgentFixed(model2, workers2[:3])
@@ -156,7 +156,7 @@ def demo_bug_b():
 
     N = 10
     # --- Unfixed ---
-    model_bad = mesa.Model(seed=2)
+    model_bad = mesa.Model()
     workers_bad = list(Worker.create_agents(model_bad, N,
                         skill=[float(i) for i in range(N)]))
     c_bad = MetaAgentUnfixed(model_bad, workers_bad[:3])
@@ -165,7 +165,7 @@ def demo_bug_b():
     after_unfixed = len(list(model_bad.agents))
 
     # --- Fixed ---
-    model_good = mesa.Model(seed=2)
+    model_good = mesa.Model()
     workers_good = list(Worker.create_agents(model_good, N,
                          skill=[float(i) for i in range(N)]))
     c_good = MetaAgentFixed(model_good, workers_good[:3])
@@ -187,7 +187,7 @@ def demo_lifecycle():
     print("LIFECYCLE API: join / leave / merge / split")
     print(SEP)
 
-    model = mesa.Model(seed=99)
+    model = mesa.Model()
     workers = list(Worker.create_agents(model, 12,
                     skill=[float(i) for i in range(12)]))
 

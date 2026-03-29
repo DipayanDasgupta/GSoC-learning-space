@@ -76,7 +76,7 @@ if __name__ == "__main__":
     print(f"  {'Step':>4}  {'Coalitions':>10}  {'Free':>6}  {'Op':>28}")
     print("  " + "-" * 53)
 
-    model   = mesa.Model(seed=SEED)
+    model   = mesa.Model()
     rng     = _random.Random(SEED)
     workers = list(Worker.create_agents(model, N_WORKERS,
                     skill=[float(i) for i in range(N_WORKERS)]))

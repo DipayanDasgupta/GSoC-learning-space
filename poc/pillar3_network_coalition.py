@@ -71,14 +71,14 @@ if __name__ == "__main__":
 
     import networkx as nx
 
-    model = mesa.Model(seed=SEED)
+    model = mesa.Model()
     # Small-world network: 15 nodes, k=4 nearest neighbours, p=0.3 rewire
     G    = nx.watts_strogatz_graph(N_AGENTS, k=4, p=0.3, seed=SEED)
-    grid = Network(G, capacity=1, directed=False)
+    grid = Network(G, capacity=1)
 
     SocialAgent.create_agents(
         model, N_AGENTS,
-        influence=[model.rng.uniform(0.1, 1.0) for _ in range(N_AGENTS)]
+        influence=[model.random.uniform(0.1, 1.0) for _ in range(N_AGENTS)]
     )
     cells = list(grid._cells.values())
     for i, agent in enumerate(model.agents):

@@ -82,7 +82,7 @@ class WorkplaceModel(mesa.Model):
     """20 workers form teams of 3; lifecycle ops run each step."""
 
     def __init__(self, n_workers: int = 20, seed: int = 42) -> None:
-        super().__init__(seed=seed)
+        super().__init__()
         Worker.create_agents(
             self, n_workers,
             skill=[self.rng.uniform(0.1, 1.0) for _ in range(n_workers)],
